@@ -31,8 +31,12 @@ wheels/
 .coverage
 htmlcov/
 .env
+
+# Large Binary & Data Artifacts
 *.npy
 *.npz
+*.parquet
+data/processed/*.parquet
 
 # OS
 .DS_Store
