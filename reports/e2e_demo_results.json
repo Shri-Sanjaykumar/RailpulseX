@@ -1,0 +1,292 @@
+{
+  "disruption": {
+    "train_number": "12673",
+    "delay_minutes": 15.0,
+    "op_date": "2024-09-01",
+    "station_code": "MAS",
+    "reason": "DEMO_DISRUPTION"
+  },
+  "conformal": {
+    "p10": 6.0,
+    "p50": 15.0,
+    "p90": 27.75,
+    "target_coverage": 0.9
+  },
+  "cascade": {
+    "affected_trains": 3,
+    "affected_stations": 2
+  },
+  "J_no_action": 36.2,
+  "scenario_results": [
+    {
+      "scenario_id": "NO_ACTION",
+      "scenario_label": "No Action",
+      "hold_min": 0,
+      "reroute": false,
+      "protect_connection": false,
+      "effective_delay": 15.0,
+      "state": {
+        "total_delay_minutes": 27.0,
+        "affected_trains": 3,
+        "affected_stations": 2,
+        "platform_conflicts": 1,
+        "connection_risk": 0.45,
+        "passenger_proxy": 150.0,
+        "crew_disruption_risk": 0.3,
+        "operational_risk_score": 0.3,
+        "effective_delay": 15.0,
+        "missed_connections": 1
+      },
+      "J": 27.875,
+      "J_risk_sensitive": 36.2,
+      "components": {
+        "passenger": 30.0,
+        "train_delay": 13.5,
+        "connection_miss": 45.0,
+        "platform_conflict": 20.0,
+        "crew_disruption": 30.0,
+        "operational_risk": 30.0
+      },
+      "cvar_penalty": 8.325
+    },
+    {
+      "scenario_id": "HOLD_5MIN",
+      "scenario_label": "Hold +5 min",
+      "hold_min": 5,
+      "reroute": false,
+      "protect_connection": false,
+      "effective_delay": 12.5,
+      "state": {
+        "total_delay_minutes": 15.0,
+        "affected_trains": 2,
+        "affected_stations": 1,
+        "platform_conflicts": 0,
+        "connection_risk": 0.3,
+        "passenger_proxy": 83.33,
+        "crew_disruption_risk": 0.2,
+        "operational_risk_score": 0.3,
+        "effective_delay": 12.5,
+        "missed_connections": 0
+      },
+      "J": 16.2081,
+      "J_risk_sensitive": 23.1456,
+      "components": {
+        "passenger": 16.67,
+        "train_delay": 7.5,
+        "connection_miss": 30.0,
+        "platform_conflict": 0.0,
+        "crew_disruption": 20.0,
+        "operational_risk": 30.0
+      },
+      "cvar_penalty": 6.9375
+    },
+    {
+      "scenario_id": "HOLD_10MIN",
+      "scenario_label": "Hold +10 min",
+      "hold_min": 10,
+      "reroute": false,
+      "protect_connection": false,
+      "effective_delay": 10.0,
+      "state": {
+        "total_delay_minutes": 12.0,
+        "affected_trains": 2,
+        "affected_stations": 1,
+        "platform_conflicts": 0,
+        "connection_risk": 0.3,
+        "passenger_proxy": 66.67,
+        "crew_disruption_risk": 0.2,
+        "operational_risk_score": 0.1,
+        "effective_delay": 10.0,
+        "missed_connections": 0
+      },
+      "J": 13.6669,
+      "J_risk_sensitive": 19.2169,
+      "components": {
+        "passenger": 13.33,
+        "train_delay": 6.0,
+        "connection_miss": 30.0,
+        "platform_conflict": 0.0,
+        "crew_disruption": 20.0,
+        "operational_risk": 10.0
+      },
+      "cvar_penalty": 5.55
+    },
+    {
+      "scenario_id": "HOLD_15MIN",
+      "scenario_label": "Hold +15 min",
+      "hold_min": 15,
+      "reroute": false,
+      "protect_connection": false,
+      "effective_delay": 7.5,
+      "state": {
+        "total_delay_minutes": 4.5,
+        "affected_trains": 1,
+        "affected_stations": 1,
+        "platform_conflicts": 0,
+        "connection_risk": 0.15,
+        "passenger_proxy": 25.0,
+        "crew_disruption_risk": 0.1,
+        "operational_risk_score": 0.1,
+        "effective_delay": 7.5,
+        "missed_connections": 0
+      },
+      "J": 6.3125,
+      "J_risk_sensitive": 10.475,
+      "components": {
+        "passenger": 5.0,
+        "train_delay": 2.25,
+        "connection_miss": 15.0,
+        "platform_conflict": 0.0,
+        "crew_disruption": 10.0,
+        "operational_risk": 10.0
+      },
+      "cvar_penalty": 4.1625
+    },
+    {
+      "scenario_id": "PLATFORM_REASSIGN",
+      "scenario_label": "Platform Reassign",
+      "hold_min": 0,
+      "reroute": true,
+      "protect_connection": false,
+      "effective_delay": 10.5,
+      "state": {
+        "total_delay_minutes": 12.6,
+        "affected_trains": 2,
+        "affected_stations": 1,
+        "platform_conflicts": 0,
+        "connection_risk": 0.3,
+        "passenger_proxy": 70.0,
+        "crew_disruption_risk": 0.2,
+        "operational_risk_score": 0.3,
+        "effective_delay": 10.5,
+        "missed_connections": 0
+      },
+      "J": 14.975,
+      "J_risk_sensitive": 20.8025,
+      "components": {
+        "passenger": 14.0,
+        "train_delay": 6.3,
+        "connection_miss": 30.0,
+        "platform_conflict": 0.0,
+        "crew_disruption": 20.0,
+        "operational_risk": 30.0
+      },
+      "cvar_penalty": 5.8275
+    },
+    {
+      "scenario_id": "CONNECTION_PROTECT",
+      "scenario_label": "Connection Protect",
+      "hold_min": 5,
+      "reroute": false,
+      "protect_connection": true,
+      "effective_delay": 12.5,
+      "state": {
+        "total_delay_minutes": 15.0,
+        "affected_trains": 2,
+        "affected_stations": 1,
+        "platform_conflicts": 0,
+        "connection_risk": 0.15,
+        "passenger_proxy": 83.33,
+        "crew_disruption_risk": 0.2,
+        "operational_risk_score": 0.3,
+        "effective_delay": 12.5,
+        "missed_connections": 0
+      },
+      "J": 13.2081,
+      "J_risk_sensitive": 20.1456,
+      "components": {
+        "passenger": 16.67,
+        "train_delay": 7.5,
+        "connection_miss": 15.0,
+        "platform_conflict": 0.0,
+        "crew_disruption": 20.0,
+        "operational_risk": 30.0
+      },
+      "cvar_penalty": 6.9375
+    },
+    {
+      "scenario_id": "REGULATION_ORDER",
+      "scenario_label": "Regulation Order",
+      "hold_min": 8,
+      "reroute": true,
+      "protect_connection": true,
+      "effective_delay": 7.7,
+      "state": {
+        "total_delay_minutes": 4.62,
+        "affected_trains": 1,
+        "affected_stations": 1,
+        "platform_conflicts": 0,
+        "connection_risk": 0.075,
+        "passenger_proxy": 25.67,
+        "crew_disruption_risk": 0.1,
+        "operational_risk_score": 0.1,
+        "effective_delay": 7.7,
+        "missed_connections": 0
+      },
+      "J": 4.8744,
+      "J_risk_sensitive": 9.1479,
+      "components": {
+        "passenger": 5.13,
+        "train_delay": 2.31,
+        "connection_miss": 7.5,
+        "platform_conflict": 0.0,
+        "crew_disruption": 10.0,
+        "operational_risk": 10.0
+      },
+      "cvar_penalty": 4.2735
+    }
+  ],
+  "best_action": {
+    "scenario_id": "REGULATION_ORDER",
+    "scenario_label": "Regulation Order",
+    "hold_min": 8,
+    "reroute": true,
+    "protect_connection": true,
+    "effective_delay": 7.7,
+    "state": {
+      "total_delay_minutes": 4.62,
+      "affected_trains": 1,
+      "affected_stations": 1,
+      "platform_conflicts": 0,
+      "connection_risk": 0.075,
+      "passenger_proxy": 25.67,
+      "crew_disruption_risk": 0.1,
+      "operational_risk_score": 0.1,
+      "effective_delay": 7.7,
+      "missed_connections": 0
+    },
+    "J": 4.8744,
+    "J_risk_sensitive": 9.1479,
+    "components": {
+      "passenger": 5.13,
+      "train_delay": 2.31,
+      "connection_miss": 7.5,
+      "platform_conflict": 0.0,
+      "crew_disruption": 10.0,
+      "operational_risk": 10.0
+    },
+    "cvar_penalty": 4.2735,
+    "solver": "CP_SAT",
+    "status": "OPTIMAL",
+    "solve_time_ms": 28.7,
+    "cvar_p90_used": 27.75,
+    "cvar_lambda": 0.3,
+    "note": "CVaR via surrogate buffer: P90 from conformal intervals used as risk headway penalty"
+  },
+  "reforecast": {
+    "original_delay_min": 15.0,
+    "post_intervention_delay_min": 7.65,
+    "post_p50_min": 11.0,
+    "post_p90_min": 22.15,
+    "J_no_action": 36.2,
+    "J_best_action": 9.1479,
+    "avoided_disruption": 27.0521,
+    "improvement_pct": 74.73,
+    "verification_status": "VERIFIED",
+    "verification_color": "green",
+    "best_action_label": "Regulation Order",
+    "best_action_id": "REGULATION_ORDER",
+    "reforecast_method": "SIMULATION_BASED"
+  },
+  "demo_label": "SYNTHETIC_PROXY_SIMULATION"
+}

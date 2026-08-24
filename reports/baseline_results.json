@@ -1,0 +1,47 @@
+[
+  {
+    "model": "ScheduledETA (0 delay)",
+    "MAE": 12.2858,
+    "RMSE": 18.0614,
+    "MedianAE": 10.82
+  },
+  {
+    "model": "Persistence (carry-forward)",
+    "MAE": 2.128,
+    "RMSE": 3.7375,
+    "MedianAE": 1.57
+  },
+  {
+    "model": "HistoricalAverage",
+    "MAE": 5.0798,
+    "RMSE": 13.5414,
+    "MedianAE": 3.0907
+  },
+  {
+    "model": "PersistenceBlend",
+    "MAE": 3.0538,
+    "RMSE": 7.2639,
+    "MedianAE": 2.1
+  },
+  {
+    "model": "LightGBM_Baseline",
+    "MAE": 1.8456,
+    "RMSE": 3.5802,
+    "MedianAE": 1.3531,
+    "PinballLoss_avg": 0.5873,
+    "Coverage_P10_P90": 0.7991,
+    "IntervalWidth_P10_P90": 5.8507,
+    "TopFeatures": {
+      "prev_delay_1": 1177,
+      "rolling_delay_3": 813,
+      "total_stops": 604,
+      "prev_delay_2": 426,
+      "distance_to_destination_km": 415,
+      "stop_index": 309,
+      "stops_remaining": 224,
+      "train_priority": 221,
+      "month_sin": 182,
+      "day_of_week_cos": 173
+    }
+  }
+]

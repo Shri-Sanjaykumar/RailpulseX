@@ -1,0 +1,22 @@
+[
+  {
+    "model": "Baseline_CQR",
+    "pre_coverage": 0.7991,
+    "post_coverage": 0.9042,
+    "pre_width": 5.8507,
+    "post_width": 7.3278,
+    "correction": 0.7386,
+    "target_coverage": 0.9,
+    "note": "Coverage is measured empirically on held-out test period. Target is 90%."
+  },
+  {
+    "model": "Proposed_CQR",
+    "pre_coverage": 0.7999,
+    "post_coverage": 0.9041,
+    "pre_width": 5.8683,
+    "post_width": 7.3318,
+    "correction": 0.7318,
+    "target_coverage": 0.9,
+    "note": "Coverage is measured empirically on held-out test period. Target is 90%."
+  }
+]

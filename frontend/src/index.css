@@ -1,0 +1,173 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --rp-bg-deep: #040711;
+  --rp-bg-panel: #0a0f1e;
+  --rp-bg-card: #121a2f;
+  --rp-border-subtle: #1e2d4a;
+  --rp-border-active: #00f0ff;
+  --rp-cyan-electric: #00f0ff;
+  --rp-cyan-glow: #00d2ff;
+  --rp-emerald-action: #00ff88;
+  --rp-amber-warning: #ffb800;
+  --rp-red-disruption: #ff3366;
+  --rp-text-primary: #f8fafc;
+  --rp-text-secondary: #94a3b8;
+  --rp-text-muted: #64748b;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--rp-bg-deep);
+  color: var(--rp-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(10, 15, 30, 0.8);
+}
+::-webkit-scrollbar-thumb {
+  background: #1e2d4a;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00f0ff;
+}
+
+/* Leaflet Container & Tiles Styling - PURE DARK OCC THEME */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: #040711 !important;
+  font-family: inherit;
+  z-index: 1 !important;
+}
+
+.leaflet-tile-pane {
+  filter: brightness(0.6) contrast(1.4) hue-rotate(190deg) saturate(0.3);
+}
+
+.leaflet-pane {
+  z-index: 10 !important;
+}
+
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 20 !important;
+}
+
+/* Leaflet Popups & Tooltips in Full Dark OCC Mode */
+.leaflet-popup-content-wrapper {
+  background: #0a0f1e !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(0, 240, 255, 0.5) !important;
+  box-shadow: 0 0 25px rgba(0, 240, 255, 0.3) !important;
+  border-radius: 8px !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+}
+
+.leaflet-popup-tip {
+  background: #0a0f1e !important;
+  border: 1px solid rgba(0, 240, 255, 0.5) !important;
+}
+
+.leaflet-tooltip {
+  background: #0a0f1e !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(0, 240, 255, 0.4) !important;
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.25) !important;
+  border-radius: 6px !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  padding: 4px 8px !important;
+}
+
+/* Modal Overlay Enforcement */
+.modal-backdrop-fixed {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 99999 !important;
+  background-color: rgba(4, 7, 17, 0.9) !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+/* Glowing Keyframes & Radar Animations */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(0, 240, 255, 0.85);
+  }
+}
+
+@keyframes hazard-pulse {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(255, 51, 102, 0.3);
+    border-color: rgba(255, 51, 102, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(255, 51, 102, 0.9);
+    border-color: rgba(255, 51, 102, 1);
+  }
+}
+
+@keyframes radar-scan {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes dash-flow {
+  0% {
+    stroke-dashoffset: 200;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes signal-glow {
+  0%, 100% {
+    opacity: 0.7;
+    filter: drop-shadow(0 0 4px currentColor);
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 12px currentColor);
+  }
+}
+
+.animate-hazard {
+  animation: hazard-pulse 1.8s infinite ease-in-out;
+}
+
+.animate-glow {
+  animation: pulse-glow 2.2s infinite ease-in-out;
+}
+
+.animate-signal {
+  animation: signal-glow 1.5s infinite ease-in-out;
+}
+
+.radar-sweep {
+  animation: radar-scan 6s linear infinite;
+  transform-origin: center center;
+}
+
+.dash-active {
+  stroke-dasharray: 8, 8;
+  animation: dash-flow 2s linear infinite;
+}

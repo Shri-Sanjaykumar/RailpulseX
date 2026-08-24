@@ -1,0 +1,9 @@
+{
+  "model": "RailPulseX_GATv2_LightGBM",
+  "MAE": 1.8453,
+  "RMSE": 3.534,
+  "MedianAE": 1.3534,
+  "PinballLoss_avg": 0.5873,
+  "Coverage_P10_P90": 0.7999,
+  "IntervalWidth_P10_P90": 5.8683
+}

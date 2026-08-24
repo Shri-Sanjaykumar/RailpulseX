@@ -1,0 +1,60 @@
+{
+  "baseline": {
+    "model": "LightGBM_Baseline",
+    "MAE": 1.8456,
+    "RMSE": 3.5802,
+    "MedianAE": 1.3531,
+    "PinballLoss_avg": 0.5873,
+    "Coverage_P10_P90": 0.7991,
+    "IntervalWidth_P10_P90": 5.8507,
+    "TopFeatures": {
+      "prev_delay_1": 1177,
+      "rolling_delay_3": 813,
+      "total_stops": 604,
+      "prev_delay_2": 426,
+      "distance_to_destination_km": 415,
+      "stop_index": 309,
+      "stops_remaining": 224,
+      "train_priority": 221,
+      "month_sin": 182,
+      "day_of_week_cos": 173
+    }
+  },
+  "proposed": {
+    "model": "RailPulseX_GATv2_LightGBM",
+    "MAE": 1.8453,
+    "RMSE": 3.534,
+    "MedianAE": 1.3534,
+    "PinballLoss_avg": 0.5873,
+    "Coverage_P10_P90": 0.7999,
+    "IntervalWidth_P10_P90": 5.8683
+  },
+  "conformal": [
+    {
+      "model": "Baseline_CQR",
+      "pre_coverage": 0.7991,
+      "post_coverage": 0.9042,
+      "pre_width": 5.8507,
+      "post_width": 7.3278,
+      "correction": 0.7386,
+      "target_coverage": 0.9,
+      "note": "Coverage is measured empirically on held-out test period. Target is 90%."
+    },
+    {
+      "model": "Proposed_CQR",
+      "pre_coverage": 0.7999,
+      "post_coverage": 0.9041,
+      "pre_width": 5.8683,
+      "post_width": 7.3318,
+      "correction": 0.7318,
+      "target_coverage": 0.9,
+      "note": "Coverage is measured empirically on held-out test period. Target is 90%."
+    }
+  ],
+  "improvements": {
+    "MAE_improvement_pct": 0.02,
+    "RMSE_improvement_pct": 1.29,
+    "MedianAE_improvement_pct": -0.02,
+    "PinballLoss_avg_improvement_pct": 0.0
+  }
+}

@@ -1,0 +1,202 @@
+
+# RailPulse-X Master Configuration
+# SIH 2026 | PS 26028
+
+project:
+  name: "RailPulse-X"
+  version: "1.0.0"
+  description: "Uncertainty-Aware Counterfactual Railway Intervention Engine"
+
+# Reproducibility
+random_seed: 42
+
+# Data paths
+data:
+  raw_dir: "data/raw"
+  interim_dir: "data/interim"
+  processed_dir: "data/processed"
+  replay_dir: "data/replay"
+  
+  sources:
+    etrain_delays: "C:/Users/Priya/Downloads/REFER/RAILPULSE X/etrain_delays.csv"
+    train_details: "C:/Users/Priya/Downloads/REFER/RAILPULSE X/Train_details_22122017.csv"
+    schedules: "C:/Users/Priya/Downloads/REFER/RAILPULSE X/schedules.json"
+    trains_geojson: "C:/Users/Priya/Downloads/REFER/RAILPULSE X/trains.json"
+    stations_geojson: "C:/Users/Priya/Downloads/REFER/RAILPULSE X/stations.json"
+
+  # Synthetic event generation
+  synthetic:
+    simulation_days: 90            # Days of synthetic operational history
+    trains_subset: 90              # Use all 90 trains from etrain_delays
+    noise_std_factor: 0.25         # Gaussian noise on delay draws
+    seed: 42
+    label: "SYNTHETIC_PROXY"       # Always label synthetic data
+
+# Split strategy (strictly chronological)
+split:
+  method: "chronological"
+  train_ratio: 0.70
+  calibration_ratio: 0.10
+  test_ratio: 0.20
+
+# Target
+target:
+  column: "delay_minutes"
+  description: "Arrival delay in minutes at each station (positive = late)"
+  prediction_horizon: "next_station_arrival"
+
+# Feature engineering
+features:
+  tabular:
+    - "scheduled_arrival_hour"
+    - "scheduled_arrival_sin"
+    - "scheduled_arrival_cos"
+    - "day_of_week"
+    - "day_of_week_sin"
+    - "day_of_week_cos"
+    - "is_peak_hour"
+    - "stop_sequence"
+    - "stops_remaining"
+    - "distance_from_origin_km"
+    - "distance_to_destination_km"
+    - "scheduled_dwell_minutes"
+    - "train_type_encoded"
+    - "train_priority"
+    - "historical_mean_delay"
+    - "historical_p90_delay"
+    - "pct_right_time"
+    - "pct_significant_delay"
+    - "segment_distance_km"
+    - "segment_scheduled_time_min"
+    - "zone_encoded"
+  
+  graph:
+    - "station_degree"
+    - "station_betweenness"
+    - "upstream_delay_1hop"
+    - "upstream_delay_2hop"
+    - "headway_margin_minutes"
+    - "platform_conflict_score"
+    - "gat_embedding_0" through "gat_embedding_63"  # GATv2 node embedding
+
+# Baseline model
+baseline:
+  model: "lightgbm"
+  params:
+    n_estimators: 500
+    learning_rate: 0.05
+    max_depth: 6
+    num_leaves: 63
+    min_child_samples: 30
+    subsample: 0.8
+    colsample_bytree: 0.8
+    reg_alpha: 0.1
+    reg_lambda: 0.1
+    objective: "quantile"
+    alpha: 0.5          # P50 baseline
+    random_state: 42
+    n_jobs: -1
+  quantiles: [0.10, 0.50, 0.90]
+
+# Proposed model
+proposed:
+  gat:
+    hidden_dim: 64
+    num_heads: 4
+    num_layers: 2
+    dropout: 0.15
+    edge_dim: 4          # Edge feature dimension
+    epochs: 50
+    lr: 0.001
+    batch_size: 256
+    quantiles: [0.10, 0.50, 0.90]
+  
+  stacker:
+    model: "lightgbm"
+    n_estimators: 300
+    learning_rate: 0.05
+    max_depth: 5
+    random_state: 42
+    objective: "quantile"
+    alpha: 0.5
+
+# Conformal prediction
+conformal:
+  method: "cqr"               # Conformalized Quantile Regression
+  library: "mapie"
+  alpha: 0.10                 # Target 90% empirical coverage
+  note: "Coverage is measured empirically on held-out test period. Target is 90%."
+
+# Impact engine weights (configurable)
+objective:
+  wp: 0.35    # passenger delay weight
+  wt: 0.25    # train delay weight
+  wc: 0.20    # connection miss weight
+  wf: 0.10    # platform conflict weight
+  wk: 0.05    # crew disruption weight
+  wr: 0.05    # operational risk weight
+  lambda_risk: 0.30   # CVaR tail risk weight in optimizer
+
+# CVaR
+cvar:
+  alpha: 0.90   # optimize for worst 10% scenarios
+  method: "surrogate_buffer"  # CP90 buffer in CP-SAT objective
+  note: "Surrogate CVaR: conformal P90 intervals used as risk-aware headway buffers"
+
+# Causal module
+causal:
+  method: "simulation_derived"
+  note: >
+    Causal effect estimates are derived from the controlled replay/simulation
+    environment. We cannot claim real historical intervention effects since
+    individual trip-level intervention data is unavailable. Results are labeled
+    SIMULATION-DERIVED CAUSAL ESTIMATION throughout.
+  model: "linear_dml"
+  confounders:
+    - "train_priority"
+    - "hour_of_day"
+    - "upstream_delay_2hop"
+    - "station_betweenness"
+    - "track_occupancy_proxy"
+    - "headway_margin_minutes"
+  treatment: "intervention_type"  # 0=proceed, 1=hold, 2=reroute
+  outcome: "downstream_delay_30min"
+
+# OR-Tools CP-SAT
+optimizer:
+  solver: "cp_sat"
+  time_limit_seconds: 10
+  min_headway_minutes: 5
+  min_dwell_minutes: 2
+  max_platform_occupancy: 1
+  num_scenarios: 20     # for CVaR buffer estimation
+
+# Graph
+graph:
+  headway_conflict_threshold_minutes: 15
+  propagation_hops: 5
+  cascade_decay_factor: 0.7
+
+# Demo scenario
+demo:
+  disruption_train: "T12673"
+  disruption_delay_minutes: 15
+  demo_trains: 20
+  demo_stations: 12
+
+# API
+api:
+  host: "0.0.0.0"
+  port: 8000
+  reload: true
+  ws_broadcast_interval: 2.0   # seconds
+
+# Model paths
+models:
+  baseline_dir: "models/baseline"
+  proposed_dir: "models/railpulse_x"
+
+# Report paths
+reports:
+  dir: "reports"
+  figures_dir: "reports/figures"
