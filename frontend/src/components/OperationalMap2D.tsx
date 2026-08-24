@@ -1,7 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Polyline, Tooltip, Popup, Circle } from 'react-leaflet';
+import React, { useState, useEffect, useMemo } from 'react';
+import { MapContainer, TileLayer, Marker, Polyline, Popup, Circle, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Navigation, Radio, MapPin } from 'lucide-react';
+import {
+  ArrowUpDown,
+  Filter,
+  Search,
+  PlusCircle,
+  Clock,
+  Gauge,
+  Layers,
+  ChevronDown
+} from 'lucide-react';
 
 interface Station {
   station_code: string;
@@ -28,6 +38,91 @@ interface OperationalMap2DProps {
   disruptedTrain: string | null;
   disruptedStation: string | null;
   affectedStations: string[];
+  onOpenJourney?: () => void;
+  onOpenWhatIf?: () => void;
+  onInjectDisruption?: (delay: number) => void;
+}
+
+// Map Controller for smooth flyTo animations
+const MapFlyTo: React.FC<{ center: [number, number]; zoom: number }> = ({ center, zoom }) => {
+  const map = useMap();
+  useEffect(() => {
+    map.flyTo(center, zoom, { duration: 1.2 });
+  }, [center, zoom, map]);
+  return null;
+};
+
+// Custom Marker Pin Generator (SVG based Notion / Airbnb style pins)
+function createPinIcon(color: string, label: string, isPulsing = false) {
+  const pulseClass = isPulsing ? 'animate-ping' : '';
+  const html = `
+    <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
+      ${isPulsing ? `<div class="${pulseClass}" style="position: absolute; top: 0; width: 32px; height: 32px; border-radius: 50%; background: ${color}; opacity: 0.6;"></div>` : ''}
+      <div style="width: 30px; height: 30px; border-radius: 50% 50% 50% 0; background: ${color}; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 8px rgba(0,0,0,0.4); border: 2px solid #ffffff;">
+        <div style="transform: rotate(45deg); font-weight: 800; font-size: 10px; color: #ffffff; font-family: monospace;">
+          ${label.slice(0, 3)}
+        </div>
+      </div>
+      <div style="margin-top: 2px; background: rgba(10, 15, 30, 0.85); color: #ffffff; font-size: 9px; font-weight: bold; font-family: monospace; padding: 1px 4px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2); white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+        ${label}
+      </div>
+    </div>
+  `;
+  return L.divIcon({
+    className: 'custom-pin-marker',
+    html: html,
+    iconSize: [40, 50],
+    iconAnchor: [20, 42],
+    popupAnchor: [0, -40],
+  });
+}
+
+// Custom Train Marker Icon (Moving capsule with live telemetry speed badge)
+function createTrainIcon(trainNumber: string, speed: number, isDisrupted: boolean) {
+  const color = isDisrupted ? '#ef4444' : '#06b6d4';
+  const html = `
+    <div style="display: flex; flex-direction: column; align-items: center; cursor: pointer;">
+      <div style="background: ${color}; color: #040711; font-weight: 900; font-size: 10px; font-family: monospace; padding: 3px 6px; border-radius: 12px; border: 2px solid #ffffff; box-shadow: 0 0 12px ${color}; display: flex; align-items: center; gap: 3px;">
+        <span>🚆</span>
+        <span>${trainNumber}</span>
+      </div>
+      <div style="background: #0a0f1e; color: #38bdf8; font-size: 8px; font-family: monospace; font-weight: bold; padding: 1px 4px; border-radius: 3px; border: 1px solid #1e2d4a; margin-top: 1px;">
+        ${speed} km/h
+      </div>
+    </div>
+  `;
+  return L.divIcon({
+    className: 'custom-train-marker',
+    html: html,
+    iconSize: [60, 40],
+    iconAnchor: [30, 20],
+    popupAnchor: [0, -20],
+  });
+}
+
+// Custom Signal Marker Icon (Traffic light styled ABS beacon)
+function createSignalIcon(aspect: string) {
+  const color =
+    aspect === 'RED'
+      ? '#ef4444'
+      : aspect === 'DOUBLE_YELLOW'
+      ? '#facc15'
+      : aspect === 'YELLOW'
+      ? '#f59e0b'
+      : '#10b981';
+
+  const html = `
+    <div style="display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: #0f172a; border: 2px solid #ffffff; box-shadow: 0 0 8px ${color};">
+      <div style="width: 8px; height: 8px; border-radius: 50%; background: ${color};"></div>
+    </div>
+  `;
+  return L.divIcon({
+    className: 'custom-signal-marker',
+    html: html,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+    popupAnchor: [0, -10],
+  });
 }
 
 export const OperationalMap2D: React.FC<OperationalMap2DProps> = ({
@@ -38,10 +133,40 @@ export const OperationalMap2D: React.FC<OperationalMap2DProps> = ({
   disruptedTrain,
   disruptedStation,
   affectedStations,
+  onOpenJourney,
+  onOpenWhatIf,
+  onInjectDisruption,
 }) => {
-  const stationLookup = new Map(stations.map(s => [s.station_code, s]));
+  // Map Layer Themes
+  const mapThemes = {
+    voyager: {
+      name: 'Voyager (Streets/Landmarks)',
+      url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+      attribution: '&copy; <a href="https://carto.com/">CartoDB Voyager</a>',
+    },
+    dark: {
+      name: 'Dark OCC Tactical',
+      url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+      attribution: '&copy; <a href="https://carto.com/">CartoDB DarkMatter</a>',
+    },
+    positron: {
+      name: 'Positron (Clean Light)',
+      url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+      attribution: '&copy; <a href="https://carto.com/">CartoDB Positron</a>',
+    },
+  };
+
+  const [activeTheme, setActiveTheme] = useState<'voyager' | 'dark' | 'positron'>('voyager');
+  const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
+  const [selectedZone, setSelectedZone] = useState<string>('ALL');
+  const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [sortBy, setSortBy] = useState<'DELAY' | 'NAME' | 'DISTANCE'>('DELAY');
+  const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
+  const [mapCenter, setMapCenter] = useState<[number, number]>([13.0827, 80.2707]);
+  const [mapZoom, setMapZoom] = useState<number>(7);
+  const [trainProgress, setTrainProgress] = useState(0.35);
   const [pulseRadius, setPulseRadius] = useState(30000);
-  const [trainProgress, setTrainProgress] = useState(0.25);
 
   // Animate train progress & shockwave pulses continuously
   useEffect(() => {
@@ -88,14 +213,14 @@ export const OperationalMap2D: React.FC<OperationalMap2DProps> = ({
     [[22.3460, 87.2320], [22.8046, 86.2029]], // KGP - TATA
   ];
 
-  // Dynamic Signals placed along the active corridor blocks
-  const dynamicSignals: Array<{ id: string; lat: number; lon: number; aspect: string; name: string }> = [
-    { id: 'SIG-MAS-AJJ', lat: 13.0822, lon: 79.9545, aspect: disruptedStation ? 'RED' : 'GREEN', name: 'AS-104 (MAS-AJJ)' },
-    { id: 'SIG-AJJ-KPD', lat: 13.0258, lon: 79.3854, aspect: disruptedStation ? 'DOUBLE_YELLOW' : 'GREEN', name: 'AS-142 (AJJ-KPD)' },
-    { id: 'SIG-KPD-JTJ', lat: 12.7836, lon: 78.8579, aspect: disruptedStation ? 'YELLOW' : 'GREEN', name: 'HS-201 (KPD-JTJ)' },
-    { id: 'SIG-JTJ-SA',  lat: 12.1309, lon: 78.3646, aspect: 'GREEN', name: 'AS-268 (JTJ-SA)' },
-    { id: 'SIG-SA-ED',   lat: 11.5026, lon: 77.9316, aspect: 'GREEN', name: 'AS-312 (SA-ED)' },
-    { id: 'SIG-ED-CBE',  lat: 11.0626, lon: 77.1484, aspect: 'GREEN', name: 'SS-405 (ED-CBE)' },
+  // Dynamic Signals along the coaching corridor
+  const dynamicSignals = [
+    { id: 'SIG-MAS-AJJ', lat: 13.0822, lon: 79.9545, aspect: disruptedStation ? 'RED' : 'GREEN', name: 'Auto Signal AS-104 (MAS-AJJ)' },
+    { id: 'SIG-AJJ-KPD', lat: 13.0258, lon: 79.3854, aspect: disruptedStation ? 'DOUBLE_YELLOW' : 'GREEN', name: 'Auto Signal AS-142 (AJJ-KPD)' },
+    { id: 'SIG-KPD-JTJ', lat: 12.7836, lon: 78.8579, aspect: disruptedStation ? 'YELLOW' : 'GREEN', name: 'Home Signal HS-201 (KPD-JTJ)' },
+    { id: 'SIG-JTJ-SA',  lat: 12.1309, lon: 78.3646, aspect: 'GREEN', name: 'Auto Signal AS-268 (JTJ-SA)' },
+    { id: 'SIG-SA-ED',   lat: 11.5026, lon: 77.9316, aspect: 'GREEN', name: 'Auto Signal AS-312 (SA-ED)' },
+    { id: 'SIG-ED-CBE',  lat: 11.0626, lon: 77.1484, aspect: 'GREEN', name: 'Starter Signal SS-405 (ED-CBE)' },
   ];
 
   // Interpolate Train 12673 moving coordinate
@@ -108,250 +233,399 @@ export const OperationalMap2D: React.FC<OperationalMap2DProps> = ({
   const trainLat = pA[0] + (pB[0] - pA[0]) * segFraction;
   const trainLon = pA[1] + (pB[1] - pA[1]) * segFraction;
 
+  // Filtered & Sorted Stations
+  const filteredStations = useMemo(() => {
+    return stations
+      .filter(s => {
+        const matchesZone = selectedZone === 'ALL' || s.zone === selectedZone;
+        const matchesSearch =
+          s.station_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          s.zone.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesZone && matchesSearch;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'DELAY') return b.delay_index - a.delay_index;
+        if (sortBy === 'NAME') return a.station_code.localeCompare(b.station_code);
+        return a.lat - b.lat;
+      });
+  }, [stations, selectedZone, searchQuery, sortBy]);
+
+  const stationLookup = useMemo(() => new Map(stations.map(s => [s.station_code, s])), [stations]);
   const disruptedStnObj = disruptedStation ? stationLookup.get(disruptedStation) : null;
 
   return (
-    <div className="w-full h-full relative rounded-lg overflow-hidden border border-[#1E2D4A] bg-[#040711]">
-      {/* Top Left OCC Telemetry HUD */}
-      <div className="absolute top-3 left-3 z-[25] flex flex-col space-y-1 font-mono text-xs pointer-events-none">
-        <span className="px-2.5 py-1 font-bold bg-[#0A0F1E]/95 text-cyan-300 border border-cyan-500/40 rounded backdrop-blur shadow-lg flex items-center space-x-1.5">
-          <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-          <span>2D OCC TACTICAL MAP — LIVE SIGNALLING & TRACK OCCUPANCY</span>
-        </span>
-        <div className="px-2 py-0.5 text-[10px] bg-[#0A0F1E]/90 text-slate-300 border border-slate-700/60 rounded backdrop-blur max-w-sm">
-          Active Train: <b className="text-cyan-300">12673 Cheran Express</b> (MAS → CBE) | ABS Signalling Active
+    <div className="w-full h-full relative rounded-lg overflow-hidden border border-[#1E2D4A] bg-[#0A0F1E] flex flex-col font-sans select-none">
+      {/* 1. Top Notion / FlightRadar Style Filter & Action Bar */}
+      <div className="h-12 bg-[#0A0F1E] border-b border-[#1E2D4A] px-3 flex items-center justify-between z-30 text-xs font-mono text-slate-200">
+        {/* Left: View Switcher & Result Count */}
+        <div className="flex items-center space-x-2">
+          {/* Map Layer Selector Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setThemeDropdownOpen(prev => !prev)}
+              className="px-2.5 py-1 bg-[#121A2F] hover:bg-[#1A2542] text-cyan-300 border border-cyan-500/40 rounded flex items-center space-x-1.5 transition shadow"
+            >
+              <Layers className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="font-bold">{mapThemes[activeTheme].name.split(' ')[0]}</span>
+              <ChevronDown className="w-3 h-3" />
+            </button>
+
+            {themeDropdownOpen && (
+              <div className="absolute top-full left-0 mt-1 w-52 bg-[#0A0F1E] border border-cyan-500/50 rounded-lg shadow-2xl py-1 z-50">
+                {(Object.keys(mapThemes) as Array<keyof typeof mapThemes>).map(key => (
+                  <button
+                    key={key}
+                    onClick={() => {
+                      setActiveTheme(key);
+                      setThemeDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-1.5 hover:bg-[#162036] transition flex items-center justify-between text-xs ${
+                      activeTheme === key ? 'text-cyan-300 font-bold bg-[#121A2F]' : 'text-slate-300'
+                    }`}
+                  >
+                    <span>{mapThemes[key].name}</span>
+                    {activeTheme === key && <span className="text-[10px] text-cyan-400">✓</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <span className="text-slate-400 text-[11px] hidden sm:inline">
+            <b className="text-white">{filteredStations.length + trains.length}</b> entities active
+          </span>
+        </div>
+
+        {/* Center: Live Search Input */}
+        <div className="flex-1 max-w-xs mx-3 relative">
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
+          <input
+            type="text"
+            placeholder="Search train (12673) or station (MAS, KPD)..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full bg-[#121A2F] border border-[#1E2D4A] rounded pl-8 pr-2 py-1 text-[11px] text-white focus:outline-none focus:border-cyan-400 font-mono placeholder:text-slate-500"
+          />
+        </div>
+
+        {/* Right: Sort & Filter Controls */}
+        <div className="flex items-center space-x-2">
+          {/* Sort Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setSortDropdownOpen(prev => !prev)}
+              className="px-2 py-1 bg-[#121A2F] hover:bg-[#1A2542] text-slate-300 border border-[#1E2D4A] rounded flex items-center space-x-1 transition"
+            >
+              <ArrowUpDown className="w-3 h-3 text-slate-400" />
+              <span>Sort: {sortBy}</span>
+            </button>
+            {sortDropdownOpen && (
+              <div className="absolute top-full right-0 mt-1 w-36 bg-[#0A0F1E] border border-[#1E2D4A] rounded-lg shadow-2xl py-1 z-50">
+                {['DELAY', 'NAME', 'DISTANCE'].map(s => (
+                  <button
+                    key={s}
+                    onClick={() => {
+                      setSortBy(s as any);
+                      setSortDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-1.5 hover:bg-[#162036] text-xs ${
+                      sortBy === s ? 'text-cyan-300 font-bold' : 'text-slate-300'
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Zone Filter Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setFilterDropdownOpen(prev => !prev)}
+              className="px-2 py-1 bg-[#121A2F] hover:bg-[#1A2542] text-slate-300 border border-[#1E2D4A] rounded flex items-center space-x-1 transition"
+            >
+              <Filter className="w-3 h-3 text-slate-400" />
+              <span>Zone: {selectedZone}</span>
+            </button>
+            {filterDropdownOpen && (
+              <div className="absolute top-full right-0 mt-1 w-32 bg-[#0A0F1E] border border-[#1E2D4A] rounded-lg shadow-2xl py-1 z-50">
+                {['ALL', 'SR', 'NR', 'CR', 'ER', 'SWR', 'SCR'].map(z => (
+                  <button
+                    key={z}
+                    onClick={() => {
+                      setSelectedZone(z);
+                      setFilterDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-1.5 hover:bg-[#162036] text-xs ${
+                      selectedZone === z ? 'text-cyan-300 font-bold' : 'text-slate-300'
+                    }`}
+                  >
+                    {z}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Quick Inject Disruption Button */}
+          {onInjectDisruption && (
+            <button
+              onClick={() => onInjectDisruption(15.0)}
+              className="px-2.5 py-1 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white rounded font-bold flex items-center space-x-1 transition shadow-lg shadow-red-900/30"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">+15m Delay</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Signal Aspect Legend */}
-      <div className="absolute top-16 left-3 z-[25] bg-[#0A0F1E]/95 border border-[#1E2D4A] rounded p-2 font-mono text-[10px] space-y-1 backdrop-blur shadow-xl">
-        <div className="font-bold text-slate-300 uppercase tracking-wider mb-1 flex items-center space-x-1">
-          <Navigation className="w-3 h-3 text-cyan-400" />
-          <span>Signals (ABS)</span>
-        </div>
-        <div className="flex items-center space-x-1.5 text-emerald-400">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#10b981]"></span>
-          <span>GREEN (Clear)</span>
-        </div>
-        <div className="flex items-center space-x-1.5 text-yellow-400">
-          <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 shadow-[0_0_8px_#facc15]"></span>
-          <span>DBL YELLOW</span>
-        </div>
-        <div className="flex items-center space-x-1.5 text-amber-400">
-          <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_#f59e0b]"></span>
-          <span>YELLOW</span>
-        </div>
-        <div className="flex items-center space-x-1.5 text-rose-400">
-          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e]"></span>
-          <span>RED (Occupied)</span>
-        </div>
-      </div>
+      {/* 2. Main Leaflet Viewport Container */}
+      <div className="flex-1 relative w-full h-full">
+        <MapContainer
+          center={mapCenter}
+          zoom={mapZoom}
+          scrollWheelZoom={true}
+          className="w-full h-full"
+        >
+          <MapFlyTo center={mapCenter} zoom={mapZoom} />
 
-      <MapContainer
-        center={[15.2, 78.8]}
-        zoom={6}
-        scrollWheelZoom={true}
-        className="w-full h-full"
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://carto.com/">CartoDB</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-        />
+          {/* Dynamic Theme Tile Layer */}
+          <TileLayer
+            key={activeTheme}
+            attribution={mapThemes[activeTheme].attribution}
+            url={mapThemes[activeTheme].url}
+          />
 
-        {/* 1. National Track Network Lines */}
-        {nationalTracks.map((c, idx) => (
+          {/* National Track Network Lines */}
+          {nationalTracks.map((c, idx) => (
+            <Polyline
+              key={`national-track-${idx}`}
+              positions={c}
+              pathOptions={{
+                color: activeTheme === 'voyager' ? '#64748b' : '#334155',
+                weight: 2.5,
+                opacity: 0.75,
+              }}
+            />
+          ))}
+
+          {/* Glowing Active Coaching Route (MAS -> CBE) */}
           <Polyline
-            key={`national-track-${idx}`}
-            positions={c}
+            positions={activeCorridorCoords}
             pathOptions={{
-              color: '#334155',
-              weight: 2.5,
-              opacity: 0.85,
+              color: activeTheme === 'voyager' ? '#0284c7' : '#00f0ff',
+              weight: 5,
+              opacity: 0.95,
             }}
           />
-        ))}
 
-        {/* 2. Highlighted Active Train Route Glow Polyline */}
-        <Polyline
-          positions={activeCorridorCoords}
-          pathOptions={{
-            color: '#00f0ff',
-            weight: 5,
-            opacity: 0.95,
-          }}
-        />
-
-        {/* 3. Pulsing Disruption Shockwave at Incident Station */}
-        {disruptedStnObj && (
-          <>
-            <Circle
-              center={[disruptedStnObj.lat, disruptedStnObj.lon]}
-              radius={pulseRadius}
-              pathOptions={{
-                color: '#ff3366',
-                fillColor: '#ff3366',
-                fillOpacity: 0.18,
-                weight: 2,
-                dashArray: '6, 6',
-              }}
-            />
-            <Circle
-              center={[disruptedStnObj.lat, disruptedStnObj.lon]}
-              radius={pulseRadius * 0.5}
-              pathOptions={{
-                color: '#ff3366',
-                fillColor: '#ff3366',
-                fillOpacity: 0.3,
-                weight: 1.5,
-              }}
-            />
-          </>
-        )}
-
-        {/* 4. Dynamic Automatic Block Signals along Track Sections */}
-        {dynamicSignals.map(sig => {
-          const sigColor =
-            sig.aspect === 'RED'
-              ? '#ff3366'
-              : sig.aspect === 'DOUBLE_YELLOW'
-              ? '#facc15'
-              : sig.aspect === 'YELLOW'
-              ? '#ffb800'
-              : '#00ff88';
-
-          return (
-            <CircleMarker
-              key={sig.id}
-              center={[sig.lat, sig.lon]}
-              radius={6}
-              pathOptions={{
-                color: '#ffffff',
-                fillColor: sigColor,
-                fillOpacity: 1,
-                weight: 1.5,
-              }}
-            >
-              <Tooltip direction="top" offset={[0, -6]} opacity={0.95} permanent={false}>
-                <div className="text-xs font-mono">
-                  <div className="font-bold text-white">{sig.name}</div>
-                  <div className="text-[10px] mt-0.5 font-bold" style={{ color: sigColor }}>
-                    Aspect: {sig.aspect}
-                  </div>
-                  <div className="text-[9px] text-slate-300">Track Circuit: {sig.aspect === 'RED' ? 'OCCUPIED' : 'CLEAR'}</div>
-                </div>
-              </Tooltip>
-            </CircleMarker>
-          );
-        })}
-
-        {/* 5. Permanent High-Contrast Station Labels & Marker Nodes */}
-        {stations.map(stn => {
-          const isDisrupted = disruptedStation === stn.station_code;
-          const isAffected = affectedStations.includes(stn.station_code);
-          const color = isDisrupted ? '#ff3366' : isAffected ? '#ffb800' : '#00f0ff';
-
-          return (
-            <React.Fragment key={stn.station_code}>
-              <CircleMarker
-                center={[stn.lat, stn.lon]}
-                radius={isDisrupted ? 11 : isAffected ? 9 : 6.5}
+          {/* Pulsing Disruption Shockwave at Incident Epicenter */}
+          {disruptedStnObj && (
+            <>
+              <Circle
+                center={[disruptedStnObj.lat, disruptedStnObj.lon]}
+                radius={pulseRadius}
                 pathOptions={{
-                  color: '#ffffff',
-                  fillColor: color,
-                  fillOpacity: 1,
-                  weight: isDisrupted ? 3 : 1.5,
+                  color: '#ef4444',
+                  fillColor: '#ef4444',
+                  fillOpacity: 0.15,
+                  weight: 2,
+                  dashArray: '6, 6',
+                }}
+              />
+              <Circle
+                center={[disruptedStnObj.lat, disruptedStnObj.lon]}
+                radius={pulseRadius * 0.5}
+                pathOptions={{
+                  color: '#ef4444',
+                  fillColor: '#ef4444',
+                  fillOpacity: 0.25,
+                  weight: 1.5,
+                }}
+              />
+            </>
+          )}
+
+          {/* Dynamic Automatic Block Signals */}
+          {dynamicSignals.map(sig => (
+            <Marker
+              key={sig.id}
+              position={[sig.lat, sig.lon]}
+              icon={createSignalIcon(sig.aspect)}
+            >
+              <Popup>
+                <div className="text-xs font-mono p-1 space-y-1.5">
+                  <div className="font-bold text-base text-cyan-400">{sig.name}</div>
+                  <div className="text-slate-300">
+                    Aspect:{' '}
+                    <b
+                      style={{
+                        color:
+                          sig.aspect === 'RED'
+                            ? '#ef4444'
+                            : sig.aspect === 'GREEN'
+                            ? '#10b981'
+                            : '#f59e0b',
+                      }}
+                    >
+                      {sig.aspect}
+                    </b>
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    Track Circuit: {sig.aspect === 'RED' ? 'OCCUPIED' : 'CLEAR'}
+                  </div>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+
+          {/* Interactive Notion/Airbnb Style Station Pins & Cards */}
+          {filteredStations.map(stn => {
+            const isDisrupted = disruptedStation === stn.station_code;
+            const isAffected = affectedStations.includes(stn.station_code);
+            const pinColor = isDisrupted ? '#ef4444' : isAffected ? '#f59e0b' : '#3b82f6';
+
+            return (
+              <Marker
+                key={stn.station_code}
+                position={[stn.lat, stn.lon]}
+                icon={createPinIcon(pinColor, stn.station_code, isDisrupted)}
+                eventHandlers={{
+                  click: () => {
+                    setMapCenter([stn.lat, stn.lon]);
+                    setMapZoom(8);
+                  },
                 }}
               >
-                {/* Permanent Station Code Badge */}
-                <Tooltip direction="right" offset={[10, 0]} opacity={0.95} permanent={true}>
-                  <div className="text-[10px] font-mono font-bold tracking-wider text-white">
-                    <span style={{ color: color }}>{stn.station_code}</span>
-                  </div>
-                </Tooltip>
-
-                <Popup>
-                  <div className="text-xs font-mono p-1">
-                    <div className="font-bold text-cyan-300 flex items-center space-x-1">
-                      <MapPin className="w-3.5 h-3.5" />
-                      <span>{stn.station_code} ({stn.zone})</span>
+                {/* Floating Dossier Card (Matching Eiffel Tower reference in screenshot) */}
+                <Popup minWidth={260} maxWidth={320}>
+                  <div className="font-sans text-xs p-1 space-y-2 text-slate-100">
+                    <div>
+                      <div className="font-bold text-sm text-cyan-300 flex items-center justify-between">
+                        <span>{stn.station_code} Junction</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-700">
+                          {stn.zone} Zone
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-400">Major Coaching Hub & Section Interchange</div>
                     </div>
-                    <div className="text-[11px] text-slate-300 mt-1">Historical Delay: {stn.delay_index} min</div>
-                    {isDisrupted && <div className="text-rose-400 font-bold mt-1">DISRUPTION ORIGIN (+15m)</div>}
-                    {isAffected && <div className="text-amber-300 font-bold mt-1">DOWNSTREAM CASCADE</div>}
+
+                    <div className="space-y-1 bg-[#040711] p-2 rounded border border-[#1E2D4A] text-[11px] font-mono">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Historical Delay:</span>
+                        <span className="font-bold text-amber-300">{stn.delay_index} min</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Line Electrification:</span>
+                        <span className="text-emerald-400">25 kV AC Double</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Platform Status:</span>
+                        <span className="text-slate-200">Allocated (Clear)</span>
+                      </div>
+                      {isDisrupted && (
+                        <div className="text-rose-400 font-bold text-[10px] pt-1 border-t border-slate-800">
+                          ⚠️ ACTIVE DISRUPTION EPICENTER (+15m)
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Quick Action Buttons inside Card */}
+                    <div className="pt-1 flex items-center space-x-1.5 font-mono">
+                      {onOpenJourney && (
+                        <button
+                          onClick={onOpenJourney}
+                          className="flex-1 py-1 bg-cyan-600/30 hover:bg-cyan-600 text-cyan-300 hover:text-slate-950 border border-cyan-500 rounded text-[10px] font-bold transition text-center"
+                        >
+                          View Journey ETAs
+                        </button>
+                      )}
+                      {onOpenWhatIf && (
+                        <button
+                          onClick={onOpenWhatIf}
+                          className="flex-1 py-1 bg-[#121A2F] hover:bg-cyan-900 text-slate-200 rounded border border-[#1E2D4A] text-[10px] font-bold transition text-center"
+                        >
+                          What-If Lab
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </Popup>
-              </CircleMarker>
-            </React.Fragment>
-          );
-        })}
+              </Marker>
+            );
+          })}
 
-        {/* 6. Real-Time Moving Active Train 12673 Marker with Label */}
-        <CircleMarker
-          center={[trainLat, trainLon]}
-          radius={10}
-          pathOptions={{
-            color: '#ffffff',
-            fillColor: disruptedTrain === selectedTrain ? '#ff3366' : '#00f0ff',
-            fillOpacity: 1,
-            weight: 3,
-          }}
-          eventHandlers={{
-            click: () => onSelectTrain(selectedTrain),
-          }}
-        >
-          <Tooltip direction="top" offset={[0, -10]} opacity={0.95} permanent={true}>
-            <div className="text-[10px] font-mono font-black text-cyan-300 bg-[#0A0F1E] px-1 py-0.5 rounded border border-cyan-500">
-              🚆 12673 (78 km/h)
-            </div>
-          </Tooltip>
-
-          <Popup>
-            <div className="text-xs font-mono p-1">
-              <div className="font-black text-cyan-400 flex items-center space-x-1">
-                <Navigation className="w-3.5 h-3.5" />
-                <span>TRAIN {selectedTrain} (LIVE TELEMETRY)</span>
-              </div>
-              <div className="text-[11px] text-slate-300 mt-1">Cheran Superfast Express</div>
-              <div className="mt-1 text-slate-400">Position: Between MAS & CBE</div>
-              <div className="font-bold text-amber-300 mt-1">
-                Delay: {disruptedTrain === selectedTrain ? '+15.0 min' : '+2.0 min'}
-              </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">Speed: 78 km/h | ABS Headway: Clear</div>
-            </div>
-          </Popup>
-        </CircleMarker>
-
-        {/* 7. Other Active Trains in Fleet */}
-        {trains.filter(t => t.train_number !== selectedTrain).map(t => {
-          const stn = stationLookup.get(t.current_station);
-          if (!stn) return null;
-          const isDisrupted = disruptedTrain === t.train_number;
-          const color = isDisrupted ? '#ff3366' : t.delay_minutes > 10 ? '#ffb800' : '#00ff88';
-
-          return (
-            <CircleMarker
-              key={t.train_number}
-              center={[stn.lat + 0.08, stn.lon + 0.08]}
-              radius={7}
-              pathOptions={{
-                color: '#ffffff',
-                fillColor: color,
-                fillOpacity: 1,
-                weight: 1.5,
-              }}
-              eventHandlers={{
-                click: () => onSelectTrain(t.train_number),
-              }}
-            >
-              <Tooltip direction="bottom" offset={[0, 8]} opacity={0.9} permanent={true}>
-                <div className="text-[9px] font-mono font-bold text-slate-200">
-                  T{t.train_number}
+          {/* Real-Time Moving Active Train 12673 Pin & Dossier Card */}
+          <Marker
+            position={[trainLat, trainLon]}
+            icon={createTrainIcon(selectedTrain, 78.5, disruptedTrain === selectedTrain)}
+            eventHandlers={{
+              click: () => onSelectTrain(selectedTrain),
+            }}
+          >
+            <Popup minWidth={280} maxWidth={340}>
+              <div className="font-sans text-xs p-1 space-y-2 text-slate-100">
+                <div>
+                  <div className="font-bold text-sm text-cyan-300 flex items-center justify-between">
+                    <span>Train {selectedTrain}</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-700">
+                      Superfast Express
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-400">Cheran Superfast (MAS → CBE)</div>
                 </div>
-              </Tooltip>
-            </CircleMarker>
-          );
-        })}
-      </MapContainer>
+
+                <div className="space-y-1 bg-[#040711] p-2 rounded border border-[#1E2D4A] text-[11px] font-mono">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Operating Speed:</span>
+                    <span className="font-bold text-cyan-300 flex items-center space-x-1">
+                      <Gauge className="w-3 h-3" />
+                      <span>78.5 km/h</span>
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Current Delay:</span>
+                    <span className="font-bold text-amber-300 flex items-center space-x-1">
+                      <Clock className="w-3 h-3" />
+                      <span>{disruptedTrain === selectedTrain ? '+15.0 min' : '+2.0 min'}</span>
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Next Stop:</span>
+                    <span className="text-slate-200">Katpadi Jn (00:04 ± 11m)</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Destination ETA:</span>
+                    <span className="text-emerald-300">Coimbatore (05:51 ± 15m)</span>
+                  </div>
+                </div>
+
+                {/* Quick Action Buttons inside Card */}
+                <div className="pt-1 flex items-center space-x-1.5 font-mono">
+                  {onOpenJourney && (
+                    <button
+                      onClick={onOpenJourney}
+                      className="flex-1 py-1.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 rounded text-[10px] font-black transition text-center shadow"
+                    >
+                      Multi-Station Journey
+                    </button>
+                  )}
+                  {onOpenWhatIf && (
+                    <button
+                      onClick={onOpenWhatIf}
+                      className="flex-1 py-1.5 bg-[#121A2F] hover:bg-cyan-900 text-cyan-300 rounded border border-cyan-500/40 text-[10px] font-bold transition text-center"
+                    >
+                      What-If Simulation
+                    </button>
+                  )}
+                </div>
+              </div>
+            </Popup>
+          </Marker>
+        </MapContainer>
+      </div>
     </div>
   );
 };

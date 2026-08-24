@@ -410,6 +410,9 @@ export function App() {
               disruptedTrain={disruptedTrain}
               disruptedStation={disruptedStation}
               affectedStations={affectedStations}
+              onOpenJourney={() => setJourneyOpen(true)}
+              onOpenWhatIf={() => setWhatIfOpen(true)}
+              onInjectDisruption={handleInjectDisruption}
             />
           )}
 
