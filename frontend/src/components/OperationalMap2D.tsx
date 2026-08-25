@@ -508,36 +508,56 @@ export const OperationalMap2D: React.FC<OperationalMap2DProps> = ({
 
           {/* Interactive Notion/Airbnb Style Station Pins & Dynamic Color Tags */}
           {filteredStations.map(stn => {
+            const isCorridor = ['MAS', 'AJJ', 'KPD', 'JTJ', 'SA', 'ED', 'TUP', 'CBE'].includes(stn.station_code);
             const isOriginIncident = disruptedStation === stn.station_code && !isApplied;
+            const isAffected = affectedStations.includes(stn.station_code) && !isApplied;
             const journeyItem = journeyLookup.get(stn.station_code);
+
             const dynamicDelay = isApplied
               ? 0
-              : journeyItem
-              ? journeyItem.predicted_delay_p50_min
               : isOriginIncident
               ? Math.round(currentDelay)
-              : affectedStations.includes(stn.station_code)
-              ? Math.round(currentDelay * 0.8)
+              : isCorridor && journeyItem
+              ? journeyItem.predicted_delay_p50_min
+              : isAffected
+              ? Math.round(currentDelay * 0.7)
               : 0;
 
             // DYNAMIC COLOR COMPUTATION ACCORDING TO SEVERITY & SIMULATION STATE
-            let pinColor = '#3b82f6'; // Default slate blue (unaffected)
-            let delayTag = `+${dynamicDelay}m`;
+            let pinColor = '#3b82f6'; // Clean Slate Blue for unaffected / regional stations (ZPL, NLR, AIP, DPI, MPLY, KLS, NDLS)
+            let delayTag = '';
 
             if (isApplied) {
-              pinColor = '#10b981'; // 🟢 Emerald (Intervention Applied & Verified)
-              delayTag = '+0m';
-            } else if (isOriginIncident || dynamicDelay >= 25) {
-              pinColor = '#ef4444'; // 🔴 Crimson Red (Incident Epicenter / Critical)
-            } else if (dynamicDelay >= 15) {
-              pinColor = '#f97316'; // 🟠 Deep Orange (Severe Bottleneck)
-            } else if (dynamicDelay >= 6) {
-              pinColor = '#f59e0b'; // 🟡 Amber / Yellow (Moderate Knock-on)
-            } else if (dynamicDelay > 0) {
-              pinColor = '#06b6d4'; // 🔵 Cyan (Minor Delay)
+              if (isCorridor || isAffected) {
+                pinColor = '#10b981'; // 🟢 Emerald (Intervention Applied & Verified)
+                delayTag = '+0m';
+              } else {
+                pinColor = '#3b82f6'; // 🔵 Clean Blue for unrelated regional stations
+                delayTag = '';
+              }
             } else {
-              pinColor = '#3b82f6'; // 🔵 Standard Blue (On-Time)
-              delayTag = 'ON-TIME';
+              // Active Disruption State
+              if (isOriginIncident) {
+                pinColor = '#ef4444'; // 🔴 Crimson Red (Incident Epicenter)
+                delayTag = `+${Math.round(currentDelay)}m`;
+              } else if (isCorridor && journeyItem) {
+                delayTag = `+${dynamicDelay}m`;
+                if (dynamicDelay >= 20) {
+                  pinColor = '#ef4444'; // 🔴 Red
+                } else if (dynamicDelay >= 12) {
+                  pinColor = '#f97316'; // 🟠 Deep Orange
+                } else if (dynamicDelay >= 5) {
+                  pinColor = '#f59e0b'; // 🟡 Amber / Yellow
+                } else {
+                  pinColor = '#06b6d4'; // 🔵 Cyan
+                }
+              } else if (isAffected) {
+                pinColor = '#f59e0b'; // 🟡 Amber (Knock-on)
+                delayTag = `+${Math.round(currentDelay * 0.7)}m`;
+              } else {
+                pinColor = '#3b82f6'; // 🔵 Standard Blue for unrelated regional stations
+                delayTag = '';
+              }
             }
 
             return (
