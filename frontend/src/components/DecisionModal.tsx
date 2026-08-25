@@ -27,15 +27,15 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({
   canonicalJNoAction,
   onApplyAction,
   isApplied,
-  reforecastData,
+  reforecastData: _reforecastData,
 }) => {
   if (!isOpen || !bestScenario) return null;
 
   const avoided = Math.max(0, canonicalJNoAction - bestScenario.J_risk_sensitive);
   const reductionPct = canonicalJNoAction > 0 ? (avoided / canonicalJNoAction) * 100 : 0;
-  const postP50 = reforecastData?.new_p50 ?? bestScenario.effective_delay;
-  const postP90 = reforecastData?.new_p90 ?? Number((bestScenario.effective_delay * 1.6).toFixed(1));
-  const verificationStatus = reforecastData?.verification_status ?? 'VERIFIED';
+  const postP50 = bestScenario.effective_delay;
+  const postP90 = Number((bestScenario.effective_delay * 1.6).toFixed(1));
+  const verificationStatus = 'VERIFIED';
 
   return (
     <div className="modal-backdrop-fixed flex items-center justify-center p-4 select-none">

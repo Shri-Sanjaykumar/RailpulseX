@@ -318,8 +318,8 @@ export function App() {
 
     setIsApplied(true);
     setCurrentStage(6); // VERIFY
-    const saved = reforecastData?.avoided_disruption ?? 27.05;
-    const pct = reforecastData?.reduction_percent ?? 74.7;
+    const saved = bestScenario ? Math.max(0, canonicalJNoAction - bestScenario.J_risk_sensitive) : (reforecastData?.avoided_disruption ?? 27.05);
+    const pct = canonicalJNoAction > 0 ? (saved / canonicalJNoAction) * 100 : (reforecastData?.reduction_percent ?? 74.7);
     addEvent(`[VERIFY] Avoided disruption verified: +${saved.toFixed(2)} pts (-${pct.toFixed(1)}% reduction) [GREEN]`, 'success');
     setDecisionOpen(true);
   };
@@ -332,7 +332,8 @@ export function App() {
     setSelectedTrain('12673');
     await new Promise(r => setTimeout(r, 600));
 
-    await handleInjectDisruption(15.0);
+    // Dynamic delay & weather execution (uses active currentDelay and active weatherCondition)
+    await handleInjectDisruption(currentDelay, weatherCondition);
     await new Promise(r => setTimeout(r, 1200));
 
     setWhatIfOpen(true);
