@@ -180,40 +180,19 @@ export function App() {
   // 4. Weather Change Dynamic Handler
   const handleWeatherChange = async (weather: string) => {
     setWeatherCondition(weather);
-    try {
-      const etaRes = await axios.get(
-        `${API_BASE}/trains/${selectedTrain}/eta?current_delay=${currentDelay}&weather_condition=${weather}`
-      );
-      setEtaData({
-        p10: etaRes.data.predicted_delay_p10,
-        p50: etaRes.data.predicted_delay_p50,
-        p90: etaRes.data.predicted_delay_p90,
-        coverage_target: etaRes.data.coverage_target || 0.90,
-        interval_width: etaRes.data.interval_width || 21.8,
-      });
-    } catch (_) {
-      const mult = weather === 'HEAVY_RAIN' ? 1.35 : weather === 'FOG' ? 1.4 : weather === 'RAIN' ? 1.15 : weather === 'HIGH_WIND' ? 1.25 : 1.0;
-      const effective = currentDelay * mult;
-      setEtaData({
-        p10: Number((effective * 0.4).toFixed(1)),
-        p50: Number(effective.toFixed(1)),
-        p90: Number((effective * 1.85).toFixed(1)),
-        coverage_target: 0.90,
-        interval_width: Number(((effective * 1.85) - (effective * 0.4)).toFixed(1)),
-      });
-    }
-    fetchJourney(selectedTrain, currentDelay, weather);
+    await handleInjectDisruption(currentDelay, weather);
     addEvent(`Weather updated to ${weather}. Recalibrated multi-station ETAs and risk buffers.`, 'warn');
   };
 
   // 5. Inject Disruption Execution
-  const handleInjectDisruption = async (delayMin: number) => {
+  const handleInjectDisruption = async (delayMin: number, weatherOverride?: string) => {
+    const activeWeather = weatherOverride || weatherCondition;
     setIsInjecting(true);
     setCurrentStage(0); // OBSERVE
     setCurrentDelay(delayMin);
     setDisruptedTrain(selectedTrain);
     setDisruptedStation('MAS');
-    addEvent(`[OBSERVE] Live observation: Train ${selectedTrain} delay changed to +${delayMin}m at MAS`, 'crit');
+    addEvent(`[OBSERVE] Live observation: Train ${selectedTrain} delay changed to +${delayMin}m at MAS (${activeWeather})`, 'crit');
 
     try {
       setCurrentStage(1); // PREDICT
@@ -221,7 +200,7 @@ export function App() {
         train_id: selectedTrain,
         station_id: 'MAS',
         delay_minutes: delayMin,
-        weather_condition: weatherCondition,
+        weather_condition: activeWeather,
       });
 
       const incidentId = disrRes.data.incident_id;
@@ -233,7 +212,7 @@ export function App() {
         interval_width: disrRes.data.eta.interval_width || 21.8,
       });
 
-      fetchJourney(selectedTrain, delayMin, weatherCondition);
+      fetchJourney(selectedTrain, delayMin, activeWeather);
 
       setCurrentStage(2); // PROPAGATE
       const cascade = disrRes.data.cascade;
@@ -275,7 +254,7 @@ export function App() {
       setIsInjecting(false);
     } catch (err) {
       console.warn('API error, using dynamic fallback simulation:', err);
-      const mult = weatherCondition === 'HEAVY_RAIN' ? 1.35 : weatherCondition === 'FOG' ? 1.4 : weatherCondition === 'RAIN' ? 1.15 : weatherCondition === 'HIGH_WIND' ? 1.25 : 1.0;
+      const mult = activeWeather === 'HEAVY_RAIN' ? 1.35 : activeWeather === 'FOG' ? 1.4 : activeWeather === 'RAIN' ? 1.15 : activeWeather === 'HIGH_WIND' ? 1.25 : 1.0;
       const baseJ = Number((36.20 * (delayMin / 15.0) * mult).toFixed(2));
       setCanonicalJNoAction(baseJ);
 

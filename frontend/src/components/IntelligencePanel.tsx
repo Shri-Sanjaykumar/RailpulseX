@@ -246,26 +246,33 @@ export const IntelligencePanel: React.FC<IntelligencePanelProps> = ({
       {/* 4. Real-Time Disruption Injector & What-If Action */}
       <div className="space-y-2">
         <button
-          onClick={() => onInjectDisruption(15.0)}
+          onClick={() => onInjectDisruption(delayMinutes)}
           disabled={isInjecting}
           className="w-full py-2.5 px-3 bg-gradient-to-r from-rose-600 to-red-700 hover:from-rose-500 hover:to-red-600 text-white rounded text-xs font-black tracking-wider flex items-center justify-center space-x-2 shadow-lg shadow-red-900/30 transition border border-red-500/40"
         >
           <AlertTriangle className="w-4 h-4" />
-          <span>{isInjecting ? 'RECALCULATING ETAS...' : 'INJECT +15 MIN DISRUPTION'}</span>
+          <span>{isInjecting ? 'RECALCULATING ETAS...' : `INJECT +${Math.round(delayMinutes)} MIN DISRUPTION`}</span>
         </button>
 
         {/* Quick presets */}
         <div className="grid grid-cols-5 gap-1 text-[10px]">
-          {[5, 10, 15, 20, 30].map(m => (
-            <button
-              key={m}
-              onClick={() => onInjectDisruption(m)}
-              disabled={isInjecting}
-              className="py-1 bg-[#162036] hover:bg-[#1f2d4d] text-slate-300 rounded border border-[#1E2D4A] text-center"
-            >
-              +{m}m
-            </button>
-          ))}
+          {[5, 10, 15, 20, 30].map(m => {
+            const isActive = Math.round(delayMinutes) === m;
+            return (
+              <button
+                key={m}
+                onClick={() => onInjectDisruption(m)}
+                disabled={isInjecting}
+                className={`py-1 rounded text-center transition font-bold ${
+                  isActive
+                    ? 'bg-rose-900/80 text-white border border-rose-500 shadow-md shadow-rose-950'
+                    : 'bg-[#162036] hover:bg-[#1f2d4d] text-slate-300 border border-[#1E2D4A]'
+                }`}
+              >
+                +{m}m
+              </button>
+            );
+          })}
         </div>
 
         <button
