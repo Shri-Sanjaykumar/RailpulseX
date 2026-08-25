@@ -201,6 +201,7 @@ export function App() {
   const handleInjectDisruption = async (delayMin: number, weatherOverride?: string) => {
     const activeWeather = weatherOverride || weatherCondition;
     setIsInjecting(true);
+    setIsApplied(false);
     setCurrentStage(0); // OBSERVE
     setCurrentDelay(delayMin);
     setDisruptedTrain(selectedTrain);

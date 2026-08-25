@@ -453,12 +453,19 @@ export const OperationalMap2D: React.FC<OperationalMap2DProps> = ({
   const trainLat = pA[0] + (pB[0] - pA[0]) * segFraction;
   const trainLon = pA[1] + (pB[1] - pA[1]) * segFraction;
 
+  // Always keep all 8 corridor stations permanently visible on the map
+  const CORRIDOR_CODES = ['MAS', 'AJJ', 'KPD', 'JTJ', 'SA', 'ED', 'TUP', 'CBE'];
+
   // Filtered & Sorted Stations
   const filteredStations = useMemo(() => {
     return stations
       .filter(s => {
+        // Always show the 8 corridor stations!
+        if (CORRIDOR_CODES.includes(s.station_code)) return true;
+
         const matchesZone = selectedZone === 'ALL' || s.zone === selectedZone;
         const matchesSearch =
+          !searchQuery.trim() ||
           s.station_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
           s.zone.toLowerCase().includes(searchQuery.toLowerCase()) ||
           (INDIAN_RAILWAYS_STATION_META[s.station_code]?.fullName || '').toLowerCase().includes(searchQuery.toLowerCase());
@@ -470,6 +477,21 @@ export const OperationalMap2D: React.FC<OperationalMap2DProps> = ({
         return a.lat - b.lat;
       });
   }, [stations, selectedZone, searchQuery, sortBy]);
+
+  // Handle Search Input: Auto fly camera smoothly to matching station
+  useEffect(() => {
+    if (!searchQuery.trim()) return;
+    const q = searchQuery.toLowerCase().trim();
+    const foundStn = stations.find(
+      s =>
+        s.station_code.toLowerCase() === q ||
+        (INDIAN_RAILWAYS_STATION_META[s.station_code]?.fullName || '').toLowerCase().includes(q)
+    );
+    if (foundStn) {
+      setMapCenter([foundStn.lat, foundStn.lon]);
+      setMapZoom(8);
+    }
+  }, [searchQuery, stations]);
 
   const stationLookup = useMemo(() => new Map(stations.map(s => [s.station_code, s])), [stations]);
   const disruptedStnObj = disruptedStation ? stationLookup.get(disruptedStation) : null;
