@@ -10,8 +10,10 @@ import {
   Clock,
   Gauge,
   Layers,
-  ChevronDown
+  ChevronDown,
+  Activity
 } from 'lucide-react';
+import { StationETAItem } from './MultiStationJourneyModal';
 
 interface Station {
   station_code: string;
@@ -38,6 +40,9 @@ interface OperationalMap2DProps {
   disruptedTrain: string | null;
   disruptedStation: string | null;
   affectedStations: string[];
+  currentDelay?: number;
+  upcomingStations?: StationETAItem[];
+  isApplied?: boolean;
   onOpenJourney?: () => void;
   onOpenWhatIf?: () => void;
   onInjectDisruption?: (delay: number) => void;
@@ -52,28 +57,29 @@ const MapFlyTo: React.FC<{ center: [number, number]; zoom: number }> = ({ center
   return null;
 };
 
-// Custom Marker Pin Generator (SVG based Notion / Airbnb style pins)
-function createPinIcon(color: string, label: string, isPulsing = false) {
+// Custom Marker Pin Generator with Dynamic Color & Delay Badge (Notion / Google Maps style)
+function createPinIcon(color: string, label: string, isPulsing = false, delayText = '') {
   const pulseClass = isPulsing ? 'animate-ping' : '';
   const html = `
     <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
-      ${isPulsing ? `<div class="${pulseClass}" style="position: absolute; top: 0; width: 32px; height: 32px; border-radius: 50%; background: ${color}; opacity: 0.6;"></div>` : ''}
-      <div style="width: 30px; height: 30px; border-radius: 50% 50% 50% 0; background: ${color}; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 8px rgba(0,0,0,0.4); border: 2px solid #ffffff;">
-        <div style="transform: rotate(45deg); font-weight: 800; font-size: 10px; color: #ffffff; font-family: monospace;">
+      ${isPulsing ? `<div class="${pulseClass}" style="position: absolute; top: -4px; width: 38px; height: 38px; border-radius: 50%; background: ${color}; opacity: 0.6;"></div>` : ''}
+      <div style="width: 32px; height: 32px; border-radius: 50% 50% 50% 0; background: ${color}; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.5); border: 2.5px solid #ffffff;">
+        <div style="transform: rotate(45deg); font-weight: 900; font-size: 10px; color: #ffffff; font-family: monospace; letter-spacing: -0.5px;">
           ${label.slice(0, 3)}
         </div>
       </div>
-      <div style="margin-top: 2px; background: rgba(10, 15, 30, 0.85); color: #ffffff; font-size: 9px; font-weight: bold; font-family: monospace; padding: 1px 4px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2); white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
-        ${label}
+      <div style="margin-top: 3px; background: rgba(10, 15, 30, 0.95); color: #ffffff; font-size: 9px; font-weight: bold; font-family: monospace; padding: 2px 6px; border-radius: 4px; border: 1.5px solid ${color}; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.4); display: flex; align-items: center; gap: 3px;">
+        <span>${label}</span>
+        ${delayText ? `<span style="color: ${color}; font-weight: 900;">${delayText}</span>` : ''}
       </div>
     </div>
   `;
   return L.divIcon({
     className: 'custom-pin-marker',
     html: html,
-    iconSize: [40, 50],
-    iconAnchor: [20, 42],
-    popupAnchor: [0, -40],
+    iconSize: [44, 52],
+    iconAnchor: [22, 44],
+    popupAnchor: [0, -42],
   });
 }
 
@@ -82,11 +88,11 @@ function createTrainIcon(trainNumber: string, speed: number, isDisrupted: boolea
   const color = isDisrupted ? '#ef4444' : '#06b6d4';
   const html = `
     <div style="display: flex; flex-direction: column; align-items: center; cursor: pointer;">
-      <div style="background: ${color}; color: #040711; font-weight: 900; font-size: 10px; font-family: monospace; padding: 3px 6px; border-radius: 12px; border: 2px solid #ffffff; box-shadow: 0 0 12px ${color}; display: flex; align-items: center; gap: 3px;">
+      <div style="background: ${color}; color: #040711; font-weight: 900; font-size: 10px; font-family: monospace; padding: 3px 7px; border-radius: 12px; border: 2px solid #ffffff; box-shadow: 0 0 14px ${color}; display: flex; align-items: center; gap: 4px;">
         <span>🚆</span>
         <span>${trainNumber}</span>
       </div>
-      <div style="background: #0a0f1e; color: #38bdf8; font-size: 8px; font-family: monospace; font-weight: bold; padding: 1px 4px; border-radius: 3px; border: 1px solid #1e2d4a; margin-top: 1px;">
+      <div style="background: #0a0f1e; color: #38bdf8; font-size: 8px; font-family: monospace; font-weight: bold; padding: 1px 5px; border-radius: 3px; border: 1px solid #1e2d4a; margin-top: 2px;">
         ${speed} km/h
       </div>
     </div>
@@ -94,9 +100,9 @@ function createTrainIcon(trainNumber: string, speed: number, isDisrupted: boolea
   return L.divIcon({
     className: 'custom-train-marker',
     html: html,
-    iconSize: [60, 40],
-    iconAnchor: [30, 20],
-    popupAnchor: [0, -20],
+    iconSize: [64, 42],
+    iconAnchor: [32, 21],
+    popupAnchor: [0, -22],
   });
 }
 
@@ -133,6 +139,9 @@ export const OperationalMap2D: React.FC<OperationalMap2DProps> = ({
   disruptedTrain,
   disruptedStation,
   affectedStations,
+  currentDelay = 15.0,
+  upcomingStations = [],
+  isApplied = false,
   onOpenJourney,
   onOpenWhatIf,
   onInjectDisruption,
@@ -163,10 +172,17 @@ export const OperationalMap2D: React.FC<OperationalMap2DProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<'DELAY' | 'NAME' | 'DISTANCE'>('DELAY');
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
-  const [mapCenter, setMapCenter] = useState<[number, number]>([13.0827, 80.2707]);
+  const [mapCenter, setMapCenter] = useState<[number, number]>([12.5, 78.8]);
   const [mapZoom, setMapZoom] = useState<number>(7);
   const [trainProgress, setTrainProgress] = useState(0.35);
   const [pulseRadius, setPulseRadius] = useState(30000);
+
+  // Lookup map for dynamic journey ETA details per station
+  const journeyLookup = useMemo(() => {
+    const map = new Map<string, StationETAItem>();
+    upcomingStations.forEach(s => map.set(s.station_code, s));
+    return map;
+  }, [upcomingStations]);
 
   // Animate train progress & shockwave pulses continuously
   useEffect(() => {
@@ -213,11 +229,11 @@ export const OperationalMap2D: React.FC<OperationalMap2DProps> = ({
     [[22.3460, 87.2320], [22.8046, 86.2029]], // KGP - TATA
   ];
 
-  // Dynamic Signals along the coaching corridor
+  // Dynamic Signals along the coaching corridor based on active disruption
   const dynamicSignals = [
-    { id: 'SIG-MAS-AJJ', lat: 13.0822, lon: 79.9545, aspect: disruptedStation ? 'RED' : 'GREEN', name: 'Auto Signal AS-104 (MAS-AJJ)' },
-    { id: 'SIG-AJJ-KPD', lat: 13.0258, lon: 79.3854, aspect: disruptedStation ? 'DOUBLE_YELLOW' : 'GREEN', name: 'Auto Signal AS-142 (AJJ-KPD)' },
-    { id: 'SIG-KPD-JTJ', lat: 12.7836, lon: 78.8579, aspect: disruptedStation ? 'YELLOW' : 'GREEN', name: 'Home Signal HS-201 (KPD-JTJ)' },
+    { id: 'SIG-MAS-AJJ', lat: 13.0822, lon: 79.9545, aspect: isApplied ? 'GREEN' : disruptedStation ? 'RED' : 'GREEN', name: 'Auto Signal AS-104 (MAS-AJJ)' },
+    { id: 'SIG-AJJ-KPD', lat: 13.0258, lon: 79.3854, aspect: isApplied ? 'GREEN' : disruptedStation ? 'DOUBLE_YELLOW' : 'GREEN', name: 'Auto Signal AS-142 (AJJ-KPD)' },
+    { id: 'SIG-KPD-JTJ', lat: 12.7836, lon: 78.8579, aspect: isApplied ? 'GREEN' : disruptedStation ? 'YELLOW' : 'GREEN', name: 'Home Signal HS-201 (KPD-JTJ)' },
     { id: 'SIG-JTJ-SA',  lat: 12.1309, lon: 78.3646, aspect: 'GREEN', name: 'Auto Signal AS-268 (JTJ-SA)' },
     { id: 'SIG-SA-ED',   lat: 11.5026, lon: 77.9316, aspect: 'GREEN', name: 'Auto Signal AS-312 (SA-ED)' },
     { id: 'SIG-ED-CBE',  lat: 11.0626, lon: 77.1484, aspect: 'GREEN', name: 'Starter Signal SS-405 (ED-CBE)' },
@@ -371,11 +387,11 @@ export const OperationalMap2D: React.FC<OperationalMap2DProps> = ({
           {/* Quick Inject Disruption Button */}
           {onInjectDisruption && (
             <button
-              onClick={() => onInjectDisruption(15.0)}
+              onClick={() => onInjectDisruption(currentDelay)}
               className="px-2.5 py-1 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white rounded font-bold flex items-center space-x-1 transition shadow-lg shadow-red-900/30"
             >
               <PlusCircle className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">+15m Delay</span>
+              <span className="hidden sm:inline">+{Math.round(currentDelay)}m Delay</span>
             </button>
           )}
         </div>
@@ -415,14 +431,14 @@ export const OperationalMap2D: React.FC<OperationalMap2DProps> = ({
           <Polyline
             positions={activeCorridorCoords}
             pathOptions={{
-              color: activeTheme === 'voyager' ? '#0284c7' : '#00f0ff',
+              color: isApplied ? '#10b981' : activeTheme === 'voyager' ? '#0284c7' : '#00f0ff',
               weight: 5,
               opacity: 0.95,
             }}
           />
 
           {/* Pulsing Disruption Shockwave at Incident Epicenter */}
-          {disruptedStnObj && (
+          {disruptedStnObj && !isApplied && (
             <>
               <Circle
                 center={[disruptedStnObj.lat, disruptedStnObj.lon]}
@@ -481,17 +497,45 @@ export const OperationalMap2D: React.FC<OperationalMap2DProps> = ({
             </Marker>
           ))}
 
-          {/* Interactive Notion/Airbnb Style Station Pins & Cards */}
+          {/* Interactive Notion/Airbnb Style Station Pins & Dynamic Color Tags */}
           {filteredStations.map(stn => {
-            const isDisrupted = disruptedStation === stn.station_code;
-            const isAffected = affectedStations.includes(stn.station_code);
-            const pinColor = isDisrupted ? '#ef4444' : isAffected ? '#f59e0b' : '#3b82f6';
+            const isOriginIncident = disruptedStation === stn.station_code && !isApplied;
+            const journeyItem = journeyLookup.get(stn.station_code);
+            const dynamicDelay = isApplied
+              ? 0
+              : journeyItem
+              ? journeyItem.predicted_delay_p50_min
+              : isOriginIncident
+              ? Math.round(currentDelay)
+              : affectedStations.includes(stn.station_code)
+              ? Math.round(currentDelay * 0.8)
+              : 0;
+
+            // DYNAMIC COLOR COMPUTATION ACCORDING TO SEVERITY & SIMULATION STATE
+            let pinColor = '#3b82f6'; // Default slate blue (unaffected)
+            let delayTag = `+${dynamicDelay}m`;
+
+            if (isApplied) {
+              pinColor = '#10b981'; // 🟢 Emerald (Intervention Applied & Verified)
+              delayTag = '+0m';
+            } else if (isOriginIncident || dynamicDelay >= 25) {
+              pinColor = '#ef4444'; // 🔴 Crimson Red (Incident Epicenter / Critical)
+            } else if (dynamicDelay >= 15) {
+              pinColor = '#f97316'; // 🟠 Deep Orange (Severe Bottleneck)
+            } else if (dynamicDelay >= 6) {
+              pinColor = '#f59e0b'; // 🟡 Amber / Yellow (Moderate Knock-on)
+            } else if (dynamicDelay > 0) {
+              pinColor = '#06b6d4'; // 🔵 Cyan (Minor Delay)
+            } else {
+              pinColor = '#3b82f6'; // 🔵 Standard Blue (On-Time)
+              delayTag = 'ON-TIME';
+            }
 
             return (
               <Marker
                 key={stn.station_code}
                 position={[stn.lat, stn.lon]}
-                icon={createPinIcon(pinColor, stn.station_code, isDisrupted)}
+                icon={createPinIcon(pinColor, stn.station_code, isOriginIncident, delayTag)}
                 eventHandlers={{
                   click: () => {
                     setMapCenter([stn.lat, stn.lon]);
@@ -500,12 +544,12 @@ export const OperationalMap2D: React.FC<OperationalMap2DProps> = ({
                 }}
               >
                 {/* Floating Dossier Card (Matching Eiffel Tower reference in screenshot) */}
-                <Popup minWidth={260} maxWidth={320}>
+                <Popup minWidth={270} maxWidth={330}>
                   <div className="font-sans text-xs p-1 space-y-2 text-slate-100">
                     <div>
-                      <div className="font-bold text-sm text-cyan-300 flex items-center justify-between">
+                      <div className="font-bold text-sm flex items-center justify-between" style={{ color: pinColor }}>
                         <span>{stn.station_code} Junction</span>
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-700">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#121A2F] border" style={{ borderColor: pinColor, color: pinColor }}>
                           {stn.zone} Zone
                         </span>
                       </div>
@@ -514,20 +558,40 @@ export const OperationalMap2D: React.FC<OperationalMap2DProps> = ({
 
                     <div className="space-y-1 bg-[#040711] p-2 rounded border border-[#1E2D4A] text-[11px] font-mono">
                       <div className="flex justify-between">
-                        <span className="text-slate-400">Historical Delay:</span>
-                        <span className="font-bold text-amber-300">{stn.delay_index} min</span>
+                        <span className="text-slate-400">Dynamic Arrival Delay:</span>
+                        <span className="font-bold" style={{ color: pinColor }}>
+                          {isApplied ? '0.0 min (Recovered)' : `+${dynamicDelay} min`}
+                        </span>
                       </div>
+                      {journeyItem && (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Dynamic ETA (P50):</span>
+                            <span className="text-cyan-300 font-bold">{journeyItem.predicted_eta_p50}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">P10 – P90 Bounds:</span>
+                            <span className="text-amber-300">{journeyItem.predicted_eta_p10} – {journeyItem.predicted_eta_p90}</span>
+                          </div>
+                        </>
+                      )}
                       <div className="flex justify-between">
                         <span className="text-slate-400">Line Electrification:</span>
                         <span className="text-emerald-400">25 kV AC Double</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-400">Platform Status:</span>
-                        <span className="text-slate-200">Allocated (Clear)</span>
+                        <span className="text-slate-200">{isOriginIncident ? 'Platform 1 (Occupied Conflict)' : 'Allocated (Clear)'}</span>
                       </div>
-                      {isDisrupted && (
-                        <div className="text-rose-400 font-bold text-[10px] pt-1 border-t border-slate-800">
-                          ⚠️ ACTIVE DISRUPTION EPICENTER (+15m)
+                      {isOriginIncident && (
+                        <div className="text-rose-400 font-bold text-[10px] pt-1 border-t border-slate-800 flex items-center space-x-1">
+                          <Activity className="w-3 h-3 text-rose-400 animate-pulse" />
+                          <span>ACTIVE DISRUPTION EPICENTER (+{Math.round(currentDelay)}m)</span>
+                        </div>
+                      )}
+                      {isApplied && (
+                        <div className="text-emerald-400 font-bold text-[10px] pt-1 border-t border-slate-800 flex items-center space-x-1">
+                          <span>✓ INTERVENTION APPLIED & REFORECASTED</span>
                         </div>
                       )}
                     </div>
@@ -560,7 +624,7 @@ export const OperationalMap2D: React.FC<OperationalMap2DProps> = ({
           {/* Real-Time Moving Active Train 12673 Pin & Dossier Card */}
           <Marker
             position={[trainLat, trainLon]}
-            icon={createTrainIcon(selectedTrain, 78.5, disruptedTrain === selectedTrain)}
+            icon={createTrainIcon(selectedTrain, 78.5, disruptedTrain === selectedTrain && !isApplied)}
             eventHandlers={{
               click: () => onSelectTrain(selectedTrain),
             }}
@@ -589,7 +653,7 @@ export const OperationalMap2D: React.FC<OperationalMap2DProps> = ({
                     <span className="text-slate-400">Current Delay:</span>
                     <span className="font-bold text-amber-300 flex items-center space-x-1">
                       <Clock className="w-3 h-3" />
-                      <span>{disruptedTrain === selectedTrain ? '+15.0 min' : '+2.0 min'}</span>
+                      <span>{isApplied ? '+0.0 min (Regulated)' : `+${Math.round(currentDelay)} min`}</span>
                     </span>
                   </div>
                   <div className="flex justify-between">

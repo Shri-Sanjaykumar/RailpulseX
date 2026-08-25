@@ -389,6 +389,9 @@ export function App() {
               disruptedTrain={disruptedTrain}
               disruptedStation={disruptedStation}
               affectedStations={affectedStations}
+              currentDelay={currentDelay}
+              upcomingStations={upcomingStations}
+              isApplied={isApplied}
               onOpenJourney={() => setJourneyOpen(true)}
               onOpenWhatIf={() => setWhatIfOpen(true)}
               onInjectDisruption={handleInjectDisruption}
