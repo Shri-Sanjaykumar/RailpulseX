@@ -93,6 +93,7 @@ export function App() {
       } catch (err) {
         console.warn('API fallback:', err);
         setStations([
+          // Main Coaching Corridor (MAS -> CBE)
           { station_code: 'MAS', lat: 13.0827, lon: 80.2707, zone: 'SR', delay_index: 12.0 },
           { station_code: 'AJJ', lat: 13.0818, lon: 79.6384, zone: 'SR', delay_index: 8.0 },
           { station_code: 'KPD', lat: 12.9698, lon: 79.1325, zone: 'SR', delay_index: 10.0 },
@@ -101,12 +102,24 @@ export function App() {
           { station_code: 'ED', lat: 11.3410, lon: 77.7172, zone: 'SR', delay_index: 7.0 },
           { station_code: 'TUP', lat: 11.1085, lon: 77.3411, zone: 'SR', delay_index: 5.0 },
           { station_code: 'CBE', lat: 11.0168, lon: 76.9558, zone: 'SR', delay_index: 8.0 },
+          // Regional & Dataset Interchange Stations
+          { station_code: 'ZPL', lat: 15.8200, lon: 79.1200, zone: 'SCR', delay_index: 4.0 },
+          { station_code: 'NLR', lat: 14.4426, lon: 79.9865, zone: 'SCR', delay_index: 6.0 },
+          { station_code: 'AIP', lat: 13.2500, lon: 80.3100, zone: 'SR', delay_index: 5.0 },
+          { station_code: 'DPI', lat: 12.1300, lon: 78.1500, zone: 'SWR', delay_index: 7.0 },
+          { station_code: 'MPLY', lat: 11.9300, lon: 79.8200, zone: 'SR', delay_index: 4.0 },
+          { station_code: 'KLS', lat: 10.9300, lon: 78.4200, zone: 'SR', delay_index: 5.0 },
+          // Major National Hubs & Junctions
           { station_code: 'SBC', lat: 12.9774, lon: 77.5708, zone: 'SWR', delay_index: 9.0 },
           { station_code: 'NDLS', lat: 28.6447, lon: 77.2194, zone: 'NR', delay_index: 14.0 },
           { station_code: 'BPL', lat: 23.2599, lon: 77.4126, zone: 'WCR', delay_index: 10.0 },
           { station_code: 'CSTM', lat: 18.9398, lon: 72.8354, zone: 'CR', delay_index: 11.0 },
           { station_code: 'HWH', lat: 22.5831, lon: 88.3426, zone: 'ER', delay_index: 15.0 },
           { station_code: 'BZA', lat: 16.5062, lon: 80.6480, zone: 'SCR', delay_index: 8.0 },
+          { station_code: 'VSKP', lat: 17.7041, lon: 83.2977, zone: 'ECoR', delay_index: 7.0 },
+          { station_code: 'HYB', lat: 17.3850, lon: 78.4867, zone: 'SCR', delay_index: 6.0 },
+          { station_code: 'PUNE', lat: 18.5204, lon: 73.8567, zone: 'CR', delay_index: 8.0 },
+          { station_code: 'ADI', lat: 23.0225, lon: 72.5714, zone: 'WR', delay_index: 7.0 },
         ]);
         setTrains([
           { train_number: '12673', train_name: 'Cheran Superfast Express', current_station: 'MAS', delay_minutes: 15.0, status: 'DELAYED', priority: 0.7 },
