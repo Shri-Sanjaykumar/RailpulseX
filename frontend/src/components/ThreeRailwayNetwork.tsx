@@ -30,6 +30,8 @@ interface ThreeRailwayProps {
   disruptedStation: string | null;
   affectedStations: string[];
   weatherCondition: string;
+  currentDelay?: number;
+  isApplied?: boolean;
 }
 
 // Convert Geo coordinates to 3D Scene Coordinates
@@ -245,6 +247,8 @@ export const ThreeRailwayNetwork: React.FC<ThreeRailwayProps> = ({
   disruptedStation,
   affectedStations,
   weatherCondition,
+  currentDelay = 15.0,
+  isApplied = false,
 }) => {
   const [cameraView, setCameraView] = useState<'OVERVIEW' | 'SR' | 'TACTICAL'>('OVERVIEW');
   const controlsRef = useRef<any>(null);
@@ -396,8 +400,16 @@ export const ThreeRailwayNetwork: React.FC<ThreeRailwayProps> = ({
         {activeCorridor3D.length > 1 && (
           <Line
             points={activeCorridor3D}
-            color="#00f0ff"
-            lineWidth={3.5}
+            color={
+              isApplied
+                ? '#10b981'
+                : currentDelay >= 20
+                ? '#ff3366'
+                : currentDelay >= 10
+                ? '#ffb800'
+                : '#00f0ff'
+            }
+            lineWidth={isApplied ? 5.5 : currentDelay >= 20 ? 5.5 : 4}
             transparent
             opacity={0.95}
           />

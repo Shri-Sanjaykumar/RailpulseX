@@ -379,6 +379,8 @@ export function App() {
               disruptedStation={disruptedStation}
               affectedStations={affectedStations}
               weatherCondition={weatherCondition}
+              currentDelay={currentDelay}
+              isApplied={isApplied}
             />
           ) : (
             <OperationalMap2D

@@ -427,13 +427,22 @@ export const OperationalMap2D: React.FC<OperationalMap2DProps> = ({
             />
           ))}
 
-          {/* Glowing Active Coaching Route (MAS -> CBE) */}
+          {/* Glowing Active Coaching Route (MAS -> CBE) with Dynamic Color */}
           <Polyline
             positions={activeCorridorCoords}
             pathOptions={{
-              color: isApplied ? '#10b981' : activeTheme === 'voyager' ? '#0284c7' : '#00f0ff',
-              weight: 5,
+              color: isApplied
+                ? '#10b981'
+                : currentDelay >= 20
+                ? '#ef4444'
+                : currentDelay >= 10
+                ? '#f59e0b'
+                : currentDelay > 0
+                ? '#06b6d4'
+                : activeTheme === 'voyager' ? '#0284c7' : '#00f0ff',
+              weight: isApplied ? 6.5 : currentDelay >= 20 ? 6.5 : 5,
               opacity: 0.95,
+              dashArray: currentDelay >= 20 && !isApplied ? '8, 8' : undefined,
             }}
           />
 
